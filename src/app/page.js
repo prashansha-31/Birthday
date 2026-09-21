@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
 
-import VideoEntrance from './components/VideoEntrance';
+import CupidEntrance from './components/CupidEntrance';
 import ConfettiBackground from './components/FloatingHearts';
 import HeroSection from './components/HeroSection';
 import RokaSection from './components/RokaSection';
@@ -14,18 +14,18 @@ import FinalSurpriseSection from './components/FinalSurpriseSection';
 import SectionDivider from './components/SectionDivider';
 
 export default function Home() {
-  // Sequence stages: 'video' -> 'main'
-  const [stage, setStage] = useState('video');
+  // Sequence stages: 'cupid' -> 'main'
+  const [stage, setStage] = useState('cupid');
 
   return (
     <>
       <AnimatePresence mode="wait">
-        {stage === 'video' && (
-          <VideoEntrance key="video" onComplete={() => setStage('main')} />
+        {stage === 'cupid' && (
+          <CupidEntrance key="cupid" onComplete={() => setStage('main')} />
         )}
       </AnimatePresence>
 
-      {/* Main website content after video intro */}
+      {/* Main website content after Cupid's bow animation */}
       {stage === 'main' && (
         <>
           {/* Party confetti paper background */}
@@ -57,7 +57,7 @@ export default function Home() {
             {/* 4. LOVE LETTERS */}
             <LoveLettersSection />
 
-            <SectionDivider emoji="🍿" />
+            <SectionDivider emoji="☕" />
 
             {/* 5. SECOND MEETING */}
             <MeetingSection number={2} />
