@@ -1,472 +1,805 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-export default function CupidEntrance({ onComplete }) {
-  // States: 'aim' -> 'firing' -> 'blooming' -> 'done'
-  const [stage, setStage] = useState('aim');
-  const [bloomedHearts, setBloomedHearts] = useState([]);
-  const canvasRef = useRef(null);
-
-  // Generate blooming heart positions using heart parametric formula
-  useEffect(() => {
-    const list = [];
-    const colors = ['#f44336', '#e91e63', '#ec407a', '#ff4081', '#f06292', '#ff80ab', '#ffb74d', '#ffd54f', '#f06292', '#e91e63'];
-    const total = 320;
-
-    for (let i = 0; i < total; i++) {
-      // Sample inside parametric heart
-      let t = Math.random() * Math.PI * 2;
-      let r = Math.sqrt(Math.random()); // uniform distribution inside shape
-
-      // Parametric heart
-      let hx = 16 * Math.pow(Math.sin(t), 3);
-      let hy = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t));
-
-      // Scale & position relative to heart canopy center
-      let x = hx * r * 9.5;
-      let y = hy * r * 9.5 - 120; // Shift above tree trunk
-
-      let scale = 0.5 + Math.random() * 0.8;
-      let color = colors[Math.floor(Math.random() * colors.length)];
-      let delay = Math.random() * 1.8; // Staggered blooming delay
-      let rotation = (Math.random() - 0.5) * 45;
-
-      list.push({ id: i, x, y, scale, color, delay, rotation });
+// Romantic sound synthesizer via Web Audio API (graceful fallback if blocked)
+const playSound = (type, isMuted) => {
+  if (isMuted) return;
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+    const ctx = new AudioContext();
+    if (ctx.state === 'suspended') {
+      ctx.resume();
     }
 
-    setBloomedHearts(list);
+    if (type === 'twang') {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(360, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(75, ctx.currentTime + 0.32);
+      gain.gain.setValueAtTime(0.28, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.32);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.32);
+    } else if (type === 'chime') {
+      const freqs = [523.25, 659.25, 783.99, 1046.5, 1318.5]; // C5, E5, G5, C6, E6
+      freqs.forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        const start = ctx.currentTime + idx * 0.08;
+        osc.frequency.setValueAtTime(freq, start);
+        gain.gain.setValueAtTime(0.2, start);
+        gain.gain.exponentialRampToValueAtTime(0.0001, start + 1.5);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(start);
+        osc.stop(start + 1.5);
+      });
+    }
+  } catch {
+    // Audio is a bonus feature; fail silently
+  }
+};
+
+export default function CupidEntrance({ onComplete }) {
+  // Stages: 'aim' -> 'firing' -> 'bloomed'
+  const [stage, setStage] = useState('aim');
+  const [isPulling, setIsPulling] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const [arrowY, setArrowY] = useState(510);
+
+  // Generate 260 blooming blossoms positioned strictly along the parametric heart formula
+  // Center of heart canopy: (300, 200)
+  const blossoms = useMemo(() => {
+    const list = [];
+    const colors = [
+      '#ff2a6d',
+      '#ff6b8b',
+      '#ff758f',
+      '#ff85a1',
+      '#f72585',
+      '#b5179e',
+      '#ffb3c1',
+      '#ffccd5',
+      '#ffd166',
+      '#ff4d6d',
+      '#c9184a',
+      '#f06292',
+    ];
+
+    for (let i = 0; i < 280; i++) {
+      const t = Math.random() * Math.PI * 2;
+      const r = Math.sqrt(Math.random()); // Uniform interior distribution
+
+      // Parametric cardioid/heart formula
+      const hx = 16 * Math.pow(Math.sin(t), 3);
+      const hy = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t));
+
+      // Coordinate scaling centered at (300, 200)
+      const x = 300 + hx * r * 8.8;
+      const y = 200 + hy * r * 8.8;
+
+      const scale = 0.55 + Math.random() * 0.7;
+      const color = colors[i % colors.length];
+      const delay = 0.35 + Math.random() * 1.6;
+      const rotation = (Math.random() - 0.5) * 60;
+      const isSakura = i % 3 === 0;
+
+      list.push({ id: i, x, y, scale, color, delay, rotation, isSakura });
+    }
+    return list;
   }, []);
 
-  const handleShoot = () => {
+  // Shockwave burst particles on impact
+  const burstParticles = useMemo(() => {
+    const list = [];
+    const colors = ['#ffd700', '#ff4081', '#ff80ab', '#ffffff', '#f50057'];
+    for (let i = 0; i < 32; i++) {
+      const angle = (i / 32) * Math.PI * 2;
+      const dist = 50 + Math.random() * 90;
+      list.push({
+        id: i,
+        x: Math.cos(angle) * dist,
+        y: Math.sin(angle) * dist,
+        color: colors[i % colors.length],
+        delay: Math.random() * 0.1,
+        size: 3 + Math.random() * 5,
+      });
+    }
+    return list;
+  }, []);
+
+  // Ambient falling cherry petals
+  const petals = useMemo(() => {
+    return Array.from({ length: 22 }, (_, i) => ({
+      id: i,
+      x: Math.random() * 100,
+      size: 13 + Math.random() * 15,
+      duration: 8 + Math.random() * 6,
+      delay: Math.random() * 6,
+      rotate: Math.random() * 360,
+    }));
+  }, []);
+
+  // Handle shooting arrow
+  const handleFire = () => {
     if (stage !== 'aim') return;
+    playSound('twang', isMuted);
     setStage('firing');
+    setIsPulling(false);
+
+    // Smooth arrow flight from 510 to 205 (target heart)
+    setArrowY(205);
+
+    // When arrow strikes target heart:
     setTimeout(() => {
-      setStage('blooming');
-    }, 600);
+      playSound('chime', isMuted);
+      setStage('bloomed');
+    }, 380);
+  };
+
+  const handleReset = (e) => {
+    e.stopPropagation();
+    setArrowY(510);
+    setStage('aim');
   };
 
   return (
     <motion.div
       initial={{ opacity: 1 }}
-      exit={{ opacity: 0, transition: { duration: 0.8 } }}
+      exit={{ opacity: 0, transition: { duration: 0.8, ease: 'easeInOut' } }}
       style={{
         position: 'fixed',
         inset: 0,
         zIndex: 99999,
-        background: '#09070f',
+        background: 'radial-gradient(ellipse at 50% 35%, #fff6f8 0%, #fde8ee 45%, #f9c2d1 85%, #f4a2b9 100%)',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'space-between',
-        fontFamily: "'Courier New', Courier, monospace",
-        color: '#fff',
-        overflow: 'hidden',
         userSelect: 'none',
+        overflow: 'hidden',
+        fontFamily: "'Outfit', sans-serif",
       }}
     >
-      {/* ── MacOS Top Window Header Bar ── */}
-      <div
+      {/* ── CSS Animations for Pure Smooth Performance ── */}
+      <style>{`
+        @keyframes heartBlossom {
+          0% { transform: scale(0); opacity: 0; }
+          65% { transform: scale(1.25); opacity: 1; }
+          100% { transform: scale(1); opacity: 0.95; }
+        }
+        .blossom-active {
+          transform-origin: 0 0;
+          animation: heartBlossom 0.65s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+        @keyframes pulseTarget {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.08); }
+        }
+        .pulse-heart {
+          animation: pulseTarget 1.8s ease-in-out infinite;
+          transform-origin: 300px 200px;
+        }
+        @keyframes floatGentle {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-6px); }
+        }
+        .floating-canopy {
+          animation: floatGentle 4s ease-in-out infinite;
+          transform-origin: 300px 200px;
+        }
+      `}</style>
+
+      {/* ── Top Header Navigation Bar ── */}
+      <header
         style={{
           width: '100%',
-          background: '#120d1c',
-          borderBottom: '1px solid rgba(255,255,255,0.08)',
-          padding: '10px 16px',
+          padding: '12px clamp(16px, 4vw, 32px)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          fontSize: '0.8rem',
-          color: 'rgba(255,255,255,0.7)',
+          zIndex: 50,
+          background: 'rgba(255, 255, 255, 0.55)',
+          backdropFilter: 'blur(14px)',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.7)',
+          boxShadow: '0 4px 18px rgba(224, 87, 128, 0.08)',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ width: 12, height: 12, borderRadius: '50%', background: '#ff5f56', display: 'inline-block' }} />
-          <span style={{ width: 12, height: 12, borderRadius: '50%', background: '#ffbd2e', display: 'inline-block' }} />
-          <span style={{ width: 12, height: 12, borderRadius: '50%', background: '#27c93f', display: 'inline-block' }} />
-          <span style={{ marginLeft: 12, fontWeight: 600, color: '#f9c6d0', fontFamily: 'Outfit, sans-serif' }}>
-            Happy Birthday · draw the bow, hit the heart
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span style={{ fontSize: '1.3rem' }}>🏹</span>
+          <span
+            style={{
+              fontSize: '0.95rem',
+              fontWeight: 600,
+              color: '#880e4f',
+              letterSpacing: '0.04em',
+            }}
+          >
+            Cupid&apos;s Birthday Archery
+          </span>
+          <span
+            style={{
+              background: '#fce4ec',
+              color: '#c2185b',
+              padding: '3px 10px',
+              borderRadius: '12px',
+              fontSize: '0.72rem',
+              fontWeight: 600,
+              border: '1px solid #f8bbd0',
+            }}
+          >
+            Komal 🌸
           </span>
         </div>
 
-        <div style={{ fontSize: '0.75rem', opacity: 0.5 }}>localhost / birthday</div>
-      </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {stage === 'bloomed' && (
+            <button
+              onClick={handleReset}
+              title="Shoot bow again"
+              style={{
+                background: 'rgba(255, 255, 255, 0.8)',
+                border: '1px solid rgba(224, 87, 128, 0.4)',
+                borderRadius: '20px',
+                padding: '6px 12px',
+                fontSize: '0.78rem',
+                fontWeight: 600,
+                color: '#ad1457',
+                cursor: 'pointer',
+              }}
+            >
+              🔄 Replay Bow
+            </button>
+          )}
 
-      {/* ── Main Archery & Blooming Stage ── */}
+          <button
+            onClick={() => setIsMuted(!isMuted)}
+            title={isMuted ? 'Unmute Sound' : 'Mute Sound'}
+            style={{
+              background: 'rgba(255, 255, 255, 0.8)',
+              border: '1px solid rgba(224, 87, 128, 0.3)',
+              borderRadius: '20px',
+              padding: '6px 14px',
+              fontSize: '0.8rem',
+              fontWeight: 500,
+              color: '#ad1457',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
+          >
+            <span>{isMuted ? '🔇 Sound Off' : '🔊 Sound On'}</span>
+          </button>
+
+          <button
+            onClick={onComplete}
+            style={{
+              background: 'linear-gradient(135deg, #e91e63 0%, #ad1457 100%)',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '20px',
+              padding: '7px 18px',
+              fontSize: '0.82rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+              boxShadow: '0 4px 12px rgba(233, 30, 99, 0.28)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              letterSpacing: '0.03em',
+            }}
+          >
+            Skip to Site ➔
+          </button>
+        </div>
+      </header>
+
+      {/* ── Main Stage Container ── */}
       <div
-        onClick={handleShoot}
+        onClick={handleFire}
+        onMouseDown={() => stage === 'aim' && setIsPulling(true)}
+        onMouseUp={handleFire}
+        onTouchStart={() => stage === 'aim' && setIsPulling(true)}
+        onTouchEnd={handleFire}
         style={{
+          position: 'relative',
           flex: 1,
           width: '100%',
-          background: 'radial-gradient(circle at 50% 40%, #fff8f5 0%, #faede8 60%, #f7e2db 100%)',
-          position: 'relative',
+          maxWidth: '860px',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
           cursor: stage === 'aim' ? 'pointer' : 'default',
-          overflow: 'hidden',
+          padding: '0 16px',
         }}
       >
-        {/* Soft background glow */}
-        <div
-          style={{
-            position: 'absolute',
-            top: '30%',
-            width: '350px',
-            height: '350px',
-            borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(233,30,99,0.18) 0%, transparent 70%)',
-            pointerEvents: 'none',
-          }}
-        />
-
-        {/* ── Stage 1: Aiming Instructions & Target Heart ── */}
+        {/* Stage 1 Aim Hint */}
         {stage === 'aim' && (
           <motion.div
-            initial={{ opacity: 0, y: -20 }}
+            initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             style={{
               position: 'absolute',
-              bottom: '120px',
+              top: '12px',
               textAlign: 'center',
-              color: '#3a2028',
-              fontFamily: "'Cormorant Garamond', serif",
-              fontSize: '1.8rem',
-              fontWeight: 600,
-              letterSpacing: '0.05em',
-              zIndex: 10,
+              zIndex: 30,
+              pointerEvents: 'none',
             }}
           >
-            Aim for the heart
-            <div style={{ fontSize: '0.85rem', fontFamily: 'Outfit, sans-serif', color: '#8b6aa7', marginTop: '4px', letterSpacing: '0.15em', textTransform: 'uppercase' }}>
-              ✦ tap anywhere to release cupid&apos;s arrow 🏹 ✦
-            </div>
-          </motion.div>
-        )}
-
-        {/* Target Sphere (in Aim stage) */}
-        {stage === 'aim' && (
-          <motion.div
-            animate={{ scale: [1, 1.08, 1] }}
-            transition={{ repeat: Infinity, duration: 2, ease: 'easeInOut' }}
-            style={{
-              position: 'absolute',
-              top: '40%',
-              width: '90px',
-              height: '90px',
-              borderRadius: '50%',
-              background: 'radial-gradient(circle at 35% 35%, #e91e63 0%, #880e4f 100%)',
-              boxShadow: '0 10px 30px rgba(233,30,99,0.4)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#fff',
-              fontSize: '2.2rem',
-              zIndex: 5,
-            }}
-          >
-            💗
-          </motion.div>
-        )}
-
-        {/* Cupid Recurve Bow (in Aim & Firing stage) */}
-        {(stage === 'aim' || stage === 'firing') && (
-          <div
-            style={{
-              position: 'absolute',
-              bottom: '220px',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              zIndex: 8,
-            }}
-          >
-            {/* Arrow shooting upward animation */}
-            <motion.div
-              animate={stage === 'firing' ? { y: -380, opacity: [1, 1, 0] } : { y: 0 }}
-              transition={{ duration: 0.55, ease: 'easeIn' }}
+            <h2
               style={{
-                position: 'relative',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
+                fontFamily: "'Cormorant Garamond', serif",
+                fontSize: 'clamp(1.7rem, 4vw, 2.4rem)',
+                color: '#880e4f',
+                fontWeight: 600,
+                margin: 0,
+                letterSpacing: '0.02em',
+                textShadow: '0 2px 8px rgba(255, 255, 255, 0.8)',
               }}
             >
-              {/* Arrow Head */}
-              <div
+              Aim for the Heart & Release
+            </h2>
+            <p
+              style={{
+                fontSize: 'clamp(0.8rem, 1.8vw, 0.95rem)',
+                color: '#ad1457',
+                margin: '4px 0 0 0',
+                letterSpacing: '0.12em',
+                textTransform: 'uppercase',
+                fontWeight: 500,
+              }}
+            >
+              ✦ Tap anywhere to loose Cupid&apos;s arrow 🏹 ✦
+            </p>
+          </motion.div>
+        )}
+
+        {/* ── Responsive Scaled SVG Canvas (Exact 600x620 ViewBox) ── */}
+        <svg
+          viewBox="0 0 600 620"
+          preserveAspectRatio="xMidYMid meet"
+          style={{
+            width: '100%',
+            height: '100%',
+            maxHeight: 'calc(100vh - 170px)',
+            overflow: 'visible',
+            zIndex: 10,
+          }}
+        >
+          <defs>
+            {/* Gold Bow Gradient */}
+            <linearGradient id="bowGoldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#ffd700" />
+              <stop offset="50%" stopColor="#f3e5ab" />
+              <stop offset="100%" stopColor="#aa771c" />
+            </linearGradient>
+
+            {/* Tree Bark Gradient */}
+            <linearGradient id="treeBarkGrad" x1="0%" y1="100%" x2="0%" y2="0%">
+              <stop offset="0%" stopColor="#2c1810" />
+              <stop offset="45%" stopColor="#4e2c1d" />
+              <stop offset="80%" stopColor="#633722" />
+              <stop offset="100%" stopColor="#7a462d" />
+            </linearGradient>
+
+            {/* Target Heart Radial Glow */}
+            <radialGradient id="targetHeartGrad" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="#ff4081" />
+              <stop offset="65%" stopColor="#e91e63" />
+              <stop offset="100%" stopColor="#ad1457" />
+            </radialGradient>
+
+            {/* Drop Shadows */}
+            <filter id="glowDrop" x="-30%" y="-30%" width="160%" height="160%">
+              <feDropShadow dx="0" dy="4" stdDeviation="6" floodColor="#e91e63" floodOpacity="0.35" />
+            </filter>
+          </defs>
+
+          {/* ═══════════ TARGET HEART (AIM & FIRING STAGES) ═══════════ */}
+          {(stage === 'aim' || stage === 'firing') && (
+            <g className="pulse-heart">
+              {/* Outer Decorative Ring */}
+              <circle
+                cx="300"
+                cy="200"
+                r="52"
+                fill="none"
+                stroke="rgba(233, 30, 99, 0.3)"
+                strokeWidth="2"
+                strokeDasharray="6 4"
+              />
+
+              {/* Glowing Aura */}
+              <circle
+                cx="300"
+                cy="200"
+                r="40"
+                fill="rgba(255, 64, 129, 0.2)"
+              />
+
+              {/* Target Heart Body */}
+              <g transform="translate(300, 196)" filter="url(#glowDrop)">
+                <path
+                  d="M 0, -8 C -14, -26 -36, -14 -36, 6 C -36, 24 -8, 38 0, 48 C 8, 38 36, 24 36, 6 C 36, -14 14, -26 0, -8 Z"
+                  fill="url(#targetHeartGrad)"
+                />
+                {/* Heart Center Star */}
+                <text x="0" y="16" textAnchor="middle" fontSize="20" fill="#fff">
+                  ✨
+                </text>
+              </g>
+            </g>
+          )}
+
+          {/* ═══════════ BURST SHOCKWAVE PARTICLES (ON HIT) ═══════════ */}
+          {stage === 'bloomed' && (
+            <g>
+              {burstParticles.map((p) => (
+                <motion.circle
+                  key={p.id}
+                  cx="300"
+                  cy="200"
+                  r={p.size}
+                  fill={p.color}
+                  initial={{ cx: 300, cy: 200, opacity: 1 }}
+                  animate={{
+                    cx: 300 + p.x,
+                    cy: 200 + p.y,
+                    opacity: 0,
+                  }}
+                  transition={{ duration: 0.75, delay: p.delay, ease: 'easeOut' }}
+                />
+              ))}
+            </g>
+          )}
+
+          {/* ═══════════ ORGANIC SAKURA HEART TREE ═══════════ */}
+          {stage === 'bloomed' && (
+            <g>
+              {/* Ground Mound / Grassy Base */}
+              <ellipse cx="300" cy="580" rx="160" ry="18" fill="rgba(194, 24, 91, 0.12)" />
+              <ellipse cx="300" cy="578" rx="110" ry="12" fill="rgba(173, 20, 87, 0.16)" />
+
+              {/* Tree Trunk and Sprawling Branches */}
+              <motion.g
+                initial={{ opacity: 0, scaleY: 0 }}
+                animate={{ opacity: 1, scaleY: 1 }}
+                transition={{ duration: 0.9, ease: 'easeOut' }}
+                style={{ transformOrigin: '300px 578px' }}
+              >
+                {/* Stately Curved Trunk */}
+                <path
+                  d="M 284,578 C 286,500 288,430 292,360 C 295,325 298,300 300,280 C 302,300 305,325 308,360 C 312,430 314,500 316,578 Z"
+                  fill="url(#treeBarkGrad)"
+                />
+
+                {/* Left Branch spreading into Left Heart Lobe */}
+                <path
+                  d="M 293,360 C 275,320 235,280 200,250 C 170,225 155,185 160,150"
+                  fill="none"
+                  stroke="url(#treeBarkGrad)"
+                  strokeWidth="11"
+                  strokeLinecap="round"
+                />
+
+                {/* Left Outer Lower Twig */}
+                <path
+                  d="M 235,280 C 205,270 175,265 145,260"
+                  fill="none"
+                  stroke="url(#treeBarkGrad)"
+                  strokeWidth="6"
+                  strokeLinecap="round"
+                />
+
+                {/* Left Inner Branch */}
+                <path
+                  d="M 195,245 C 205,205 225,175 245,150"
+                  fill="none"
+                  stroke="url(#treeBarkGrad)"
+                  strokeWidth="5"
+                  strokeLinecap="round"
+                />
+
+                {/* Right Branch spreading into Right Heart Lobe */}
+                <path
+                  d="M 307,360 C 325,320 365,280 400,250 C 430,225 445,185 440,150"
+                  fill="none"
+                  stroke="url(#treeBarkGrad)"
+                  strokeWidth="11"
+                  strokeLinecap="round"
+                />
+
+                {/* Right Outer Lower Twig */}
+                <path
+                  d="M 365,280 C 395,270 425,265 455,260"
+                  fill="none"
+                  stroke="url(#treeBarkGrad)"
+                  strokeWidth="6"
+                  strokeLinecap="round"
+                />
+
+                {/* Right Inner Branch */}
+                <path
+                  d="M 405,245 C 395,205 375,175 355,150"
+                  fill="none"
+                  stroke="url(#treeBarkGrad)"
+                  strokeWidth="5"
+                  strokeLinecap="round"
+                />
+
+                {/* Center Ridge Branch */}
+                <path
+                  d="M 300,280 C 298,245 298,215 300,185"
+                  fill="none"
+                  stroke="url(#treeBarkGrad)"
+                  strokeWidth="7"
+                  strokeLinecap="round"
+                />
+              </motion.g>
+
+              {/* ═══════════ CANOPY OF 280 BLOOMING HEARTS & SAKURA FLOWERS ═══════════ */}
+              <g className="floating-canopy">
+                {blossoms.map((b) => (
+                  <g
+                    key={b.id}
+                    transform={`translate(${b.x}, ${b.y}) rotate(${b.rotation})`}
+                  >
+                    <g
+                      className="blossom-active"
+                      style={{ animationDelay: `${b.delay}s` }}
+                    >
+                      {b.isSakura ? (
+                        /* Delicate Sakura 5-Petal Blossom */
+                        <g transform={`scale(${b.scale * 0.85})`}>
+                          <circle cx="0" cy="-6" r="4.5" fill={b.color} />
+                          <circle cx="5.7" cy="-1.8" r="4.5" fill={b.color} />
+                          <circle cx="3.5" cy="4.8" r="4.5" fill={b.color} />
+                          <circle cx="-3.5" cy="4.8" r="4.5" fill={b.color} />
+                          <circle cx="-5.7" cy="-1.8" r="4.5" fill={b.color} />
+                          <circle cx="0" cy="0" r="2.5" fill="#fff9c4" />
+                        </g>
+                      ) : (
+                        /* Romantic Heart Flower */
+                        <path
+                          d="M 0,-4 C -5,-12 -12,-8 -12,-1 C -12,5 -3,11 0,16 C 3,11 12,5 12,-1 C 12,-8 5,-12 0,-4 Z"
+                          fill={b.color}
+                          transform={`scale(${b.scale})`}
+                          filter="drop-shadow(0 2px 3px rgba(173, 20, 87, 0.2))"
+                        />
+                      )}
+                    </g>
+                  </g>
+                ))}
+              </g>
+            </g>
+          )}
+
+          {/* ═══════════ CUPID'S RECURVE BOW & STRING (AIM & FIRING) ═══════════ */}
+          {(stage === 'aim' || stage === 'firing') && (
+            <g transform="translate(300, 520)">
+              {/* Bow Limbs */}
+              <path
+                d="M -100,25 C -75,-25 -25,-40 0,-42 C 25,-40 75,-25 100,25"
+                fill="none"
+                stroke="url(#bowGoldGrad)"
+                strokeWidth="7"
+                strokeLinecap="round"
+                filter="drop-shadow(0 3px 6px rgba(0,0,0,0.18))"
+              />
+
+              {/* Bow Center Grip & End Finials */}
+              <rect x="-12" y="-45" width="24" height="8" rx="4" fill="#880e4f" />
+              <circle cx="0" cy="-41" r="3.5" fill="#ffd700" />
+              <circle cx="-100" cy="25" r="4.5" fill="#ffd700" />
+              <circle cx="100" cy="25" r="4.5" fill="#ffd700" />
+
+              {/* Bowstring */}
+              <path
+                d={
+                  isPulling
+                    ? 'M -100,25 Q 0,22 100,25'
+                    : stage === 'firing'
+                    ? 'M -100,25 Q 0,-38 100,25'
+                    : 'M -100,25 Q 0,-25 100,25'
+                }
+                fill="none"
+                stroke="#ffffff"
+                strokeWidth="2.5"
+                opacity="0.9"
                 style={{
-                  width: 0,
-                  height: 0,
-                  borderLeft: '7px solid transparent',
-                  borderRight: '7px solid transparent',
-                  borderBottom: '14px solid #c2687a',
+                  transition: stage === 'firing' ? 'all 0.12s cubic-bezier(0.175, 0.885, 0.32, 1.275)' : 'all 0.1s ease',
                 }}
               />
-              {/* Shaft */}
-              <div style={{ width: '3px', height: '90px', background: '#5a3d4a' }} />
-              {/* Golden Winged Fletch */}
-              <div style={{ fontSize: '0.9rem', color: '#ffd54f', marginTop: '-6px' }}>🪶</div>
-            </motion.div>
+            </g>
+          )}
 
-            {/* Recurve Bow SVG */}
-            <svg width="120" height="70" viewBox="0 0 120 70" style={{ marginTop: '-20px' }}>
-              {/* Limb */}
-              <path
-                d="M 10,60 Q 60,-10 110,60"
-                fill="none"
-                stroke="#5a3d4a"
-                strokeWidth="5"
+          {/* ═══════════ CUPID'S ARROW (AIM & FIRING) ═══════════ */}
+          {(stage === 'aim' || stage === 'firing') && (
+            <g
+              transform={`translate(300, ${arrowY + (isPulling ? 20 : 0)})`}
+              style={{
+                transition: stage === 'firing' ? 'transform 0.38s cubic-bezier(0.4, 0, 0.2, 1)' : 'transform 0.1s ease',
+              }}
+            >
+              {/* Arrow Trail Effect during Flight */}
+              {stage === 'firing' && (
+                <line
+                  x1="0"
+                  y1="35"
+                  x2="0"
+                  y2="100"
+                  stroke="rgba(255, 64, 129, 0.45)"
+                  strokeWidth="5"
+                  strokeLinecap="round"
+                />
+              )}
+
+              {/* Golden Shaft */}
+              <line
+                x1="0"
+                y1="25"
+                x2="0"
+                y2="-70"
+                stroke="#d4af37"
+                strokeWidth="3.5"
                 strokeLinecap="round"
               />
-              {/* String */}
-              <line
-                x1="10"
-                y1="60"
-                x2="110"
-                y2="60"
-                stroke="#d4b8e0"
-                strokeWidth="2"
-              />
-            </svg>
-          </div>
-        )}
 
-        {/* ── Stage 3: Blooming Tree & Heart Leaves ── */}
-        {stage === 'blooming' && (
-          <div
-            style={{
-              position: 'relative',
-              width: '100%',
-              height: '100%',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            {/* Growing Dark Elegant Tree Trunk */}
+              {/* Heart Arrowhead */}
+              <path
+                d="M 0,-85 C -10,-72 -12,-58 0,-63 C 12,-58 10,-72 0,-85 Z"
+                fill="#e91e63"
+                stroke="#ffd700"
+                strokeWidth="1.5"
+              />
+
+              {/* White Feathers Fletching */}
+              <path d="M -9,22 L 0,12 L 9,22" fill="none" stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round" />
+              <path d="M -7,12 L 0,4 L 7,12" fill="none" stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round" />
+              <circle cx="0" cy="25" r="3" fill="#d4af37" />
+            </g>
+          )}
+        </svg>
+
+        {/* ── STAGE 3: SLEEK FLOATING BIRTHDAY CELEBRATION CARD ── */}
+        <AnimatePresence>
+          {stage === 'bloomed' && (
             <motion.div
-              initial={{ height: 0 }}
-              animate={{ height: '240px' }}
-              transition={{ duration: 1.2, ease: 'easeOut' }}
+              initial={{ opacity: 0, y: 25, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ delay: 1.2, duration: 0.8, ease: 'easeOut' }}
               style={{
                 position: 'absolute',
-                bottom: '100px',
-                width: '12px',
-                background: 'linear-gradient(to top, #3e2723 0%, #5d4037 100%)',
-                borderRadius: '6px',
-                transformOrigin: 'bottom center',
-                zIndex: 2,
-              }}
-            >
-              {/* Main Branches */}
-              <div
-                style={{
-                  position: 'absolute',
-                  top: '20px',
-                  left: '-40px',
-                  width: '50px',
-                  height: '6px',
-                  background: '#5d4037',
-                  borderRadius: '3px',
-                  transform: 'rotate(-35deg)',
-                }}
-              />
-              <div
-                style={{
-                  position: 'absolute',
-                  top: '15px',
-                  right: '-40px',
-                  width: '50px',
-                  height: '6px',
-                  background: '#5d4037',
-                  borderRadius: '3px',
-                  transform: 'rotate(35deg)',
-                }}
-              />
-            </motion.div>
-
-            {/* Heart-Shaped Canopy of Blooming Hearts */}
-            <div
-              style={{
-                position: 'absolute',
-                bottom: '340px',
-                width: 0,
-                height: 0,
-                zIndex: 3,
-              }}
-            >
-              {bloomedHearts.map((h) => (
-                <motion.div
-                  key={h.id}
-                  initial={{ scale: 0, opacity: 0 }}
-                  animate={{ scale: h.scale, opacity: 1 }}
-                  transition={{ delay: h.delay, duration: 0.6, ease: 'backOut' }}
-                  style={{
-                    position: 'absolute',
-                    left: `${h.x}px`,
-                    top: `${h.y}px`,
-                    fontSize: '1.2rem',
-                    color: h.color,
-                    transform: `rotate(${h.rotation}deg)`,
-                    filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.1))',
-                  }}
-                >
-                  💗
-                </motion.div>
-              ))}
-            </div>
-
-            {/* Script Text & Happy Birthday Message */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 2.2, duration: 0.8 }}
-              style={{
-                position: 'absolute',
-                left: ' clamp(16px, 8vw, 60px)',
-                bottom: '140px',
-                zIndex: 10,
-                textAlign: 'left',
+                bottom: '12px',
+                width: 'calc(100% - 32px)',
+                maxWidth: '540px',
+                background: 'rgba(255, 255, 255, 0.92)',
+                backdropFilter: 'blur(16px)',
+                border: '1px solid rgba(255, 255, 255, 0.95)',
+                borderRadius: '24px',
+                padding: '16px 24px',
+                textAlign: 'center',
+                boxShadow: '0 16px 40px rgba(194, 24, 91, 0.22), 0 0 0 1px rgba(233, 30, 99, 0.1)',
+                zIndex: 60,
               }}
             >
               <div
                 style={{
                   fontFamily: "'Cormorant Garamond', serif",
-                  fontSize: 'clamp(1.1rem, 2.5vw, 1.5rem)',
+                  fontSize: 'clamp(0.95rem, 2vw, 1.15rem)',
                   fontStyle: 'italic',
-                  color: '#6a4050',
-                  marginBottom: '0.2rem',
+                  color: '#ad1457',
+                  letterSpacing: '0.04em',
                 }}
               >
-                and... make it count
+                ✦ The arrow has found its mark ✦
               </div>
 
               <h1
                 style={{
                   fontFamily: "'Great Vibes', cursive",
-                  fontSize: 'clamp(2.8rem, 7vw, 4.8rem)',
-                  color: '#c2687a',
+                  fontSize: 'clamp(2.4rem, 6vw, 3.8rem)',
+                  color: '#880e4f',
+                  margin: '2px 0 0 0',
                   lineHeight: 1.1,
-                  margin: 0,
-                  textShadow: '0 4px 15px rgba(194,104,122,0.2)',
+                  textShadow: '0 3px 12px rgba(136, 14, 79, 0.15)',
                 }}
               >
-                Happy Birthday
+                Happy Birthday, Komal 🌸
               </h1>
 
-              <div
+              <p
                 style={{
-                  fontFamily: "'Cormorant Garamond', serif",
-                  fontSize: 'clamp(0.95rem, 2vw, 1.2rem)',
-                  color: '#7a5a68',
-                  marginTop: '0.4rem',
-                  letterSpacing: '0.05em',
+                  fontSize: 'clamp(0.82rem, 1.8vw, 0.95rem)',
+                  color: '#4a2838',
+                  marginTop: '4px',
+                  marginBottom: '14px',
+                  lineHeight: 1.45,
+                  fontWeight: 400,
                 }}
               >
-                here&apos;s to a year that blooms ✨
-              </div>
+                May this year bloom with all the boundless love, beauty, and magical memories you deserve.
+              </p>
 
               <button
                 onClick={onComplete}
                 style={{
-                  marginTop: '1.5rem',
-                  background: 'linear-gradient(135deg, #c2687a 0%, #8b6aa7 100%)',
+                  background: 'linear-gradient(135deg, #e91e63 0%, #ad1457 100%)',
                   color: '#fff',
-                  fontFamily: 'Outfit, sans-serif',
-                  fontSize: '0.9rem',
+                  fontSize: 'clamp(0.85rem, 1.9vw, 1rem)',
                   fontWeight: 600,
-                  padding: '10px 24px',
+                  padding: '11px 32px',
                   borderRadius: '30px',
                   border: 'none',
                   cursor: 'pointer',
-                  boxShadow: '0 6px 20px rgba(194,104,122,0.4)',
-                  letterSpacing: '0.1em',
+                  boxShadow: '0 8px 24px rgba(233, 30, 99, 0.38)',
+                  letterSpacing: '0.06em',
                   textTransform: 'uppercase',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)';
+                  e.currentTarget.style.boxShadow = '0 12px 28px rgba(233, 30, 99, 0.48)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                  e.currentTarget.style.boxShadow = '0 8px 24px rgba(233, 30, 99, 0.38)';
                 }}
               >
-                Enter Komal&apos;s Birthday World 🌸
+                Enter Komal&apos;s Birthday World 🌸 ✨
               </button>
             </motion.div>
-          </div>
-        )}
+          )}
+        </AnimatePresence>
       </div>
 
-      {/* ── IDE Code Panel Below Canvas ── */}
+      {/* ── Floating Cherry Blossom Petals Background ── */}
       <div
         style={{
-          width: '100%',
-          background: '#0a0710',
-          borderTop: '1px solid rgba(255,255,255,0.08)',
-          padding: '16px clamp(12px, 3vw, 24px)',
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-          gap: '16px',
+          position: 'absolute',
+          inset: 0,
+          pointerEvents: 'none',
+          zIndex: 4,
+          overflow: 'hidden',
         }}
       >
-        {/* Left IDE Card: index.html */}
-        <div
-          style={{
-            background: '#120d1c',
-            borderRadius: '12px',
-            border: '1px solid rgba(255,255,255,0.06)',
-            padding: '14px 18px',
-            fontSize: '0.75rem',
-            lineHeight: 1.6,
-            color: '#a095b5',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, color: '#e288a2', fontWeight: 600 }}>
-            <span>📄 index.html</span>
-            <span style={{ fontSize: '0.7rem', color: '#665c7a' }}>one bow, one heart</span>
-          </div>
-          <pre style={{ margin: 0, fontFamily: 'monospace', color: '#d4c7e7', overflowX: 'auto' }}>
-            {`<!-- a real recurve bow + a Cupid's arrow -->
-<div class="archery">
-  <svg class="bow">
-    <path class="limb" />
-    <line class="string" />
-  </svg>
-  <svg class="arrow">
-    <!-- winged gold heart -->
-    <path class="head" />
-    <g class="fletch" />
-  </svg>
-</div>`}
-          </pre>
-        </div>
-
-        {/* Right IDE Card: birthday.js */}
-        <div
-          style={{
-            background: '#120d1c',
-            borderRadius: '12px',
-            border: '1px solid rgba(255,255,255,0.06)',
-            padding: '14px 18px',
-            fontSize: '0.75rem',
-            lineHeight: 1.6,
-            color: '#a095b5',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, color: '#ffb74d', fontWeight: 600 }}>
-            <span>⚡ birthday.js</span>
-            <span style={{ fontSize: '0.7rem', color: '#665c7a' }}>draw → fire → bloom</span>
-          </div>
-          <pre style={{ margin: 0, fontFamily: 'monospace', color: '#ffd54f', overflowX: 'auto' }}>
-            {`// pull back, then let it fly
-function fire() {
-  string.to({ y2: rest }, 'elastic.out'); // twang
-  arrow.to({ y: heart });                // whoosh
-}
-
-// bloom hearts inside a heart
-while (hearts.length < 340) {
-  const [u, v] = sample();
-  if (inHeart(u, v)) bloom(u, v, pick(rose));
-}`}
-          </pre>
-        </div>
+        {petals.map((p) => (
+          <motion.div
+            key={p.id}
+            initial={{ y: '-10%', x: `${p.x}vw`, rotate: p.rotate, opacity: 0 }}
+            animate={{
+              y: '110vh',
+              x: `${p.x + (Math.sin(p.id) * 8)}vw`,
+              rotate: p.rotate + 360,
+              opacity: [0, 0.75, 0.75, 0],
+            }}
+            transition={{
+              duration: p.duration,
+              delay: p.delay,
+              repeat: Infinity,
+              ease: 'linear',
+            }}
+            style={{
+              position: 'absolute',
+              fontSize: `${p.size}px`,
+              filter: 'drop-shadow(0 2px 4px rgba(233, 30, 99, 0.15))',
+            }}
+          >
+            🌸
+          </motion.div>
+        ))}
       </div>
     </motion.div>
   );
