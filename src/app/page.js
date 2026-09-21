@@ -1,0 +1,105 @@
+'use client';
+
+import { useState } from 'react';
+import { AnimatePresence } from 'framer-motion';
+
+import NetflixIntroAnimation from './components/netflix/NetflixIntroAnimation';
+import NetflixProfile from './components/netflix/NetflixProfile';
+import ConfettiBackground from './components/FloatingHearts';
+import HeroSection from './components/HeroSection';
+import RokaSection from './components/RokaSection';
+import MeetingSection from './components/MeetingSection';
+import LoveLettersSection from './components/LoveLettersSection';
+import SurpriseSection from './components/SurpriseSection';
+import NetflixSection from './components/NetflixSection';
+import FinalSurpriseSection from './components/FinalSurpriseSection';
+import SectionDivider from './components/SectionDivider';
+
+export default function Home() {
+  // Sequence stages: 'intro' -> 'profile' -> 'main'
+  const [stage, setStage] = useState('intro');
+
+  return (
+    <>
+      <AnimatePresence mode="wait">
+        {stage === 'intro' && (
+          <NetflixIntroAnimation key="intro" onComplete={() => setStage('profile')} />
+        )}
+
+        {stage === 'profile' && (
+          <NetflixProfile key="profile" onComplete={() => setStage('main')} />
+        )}
+      </AnimatePresence>
+
+      {/* Main website content after profile selection */}
+      {stage === 'main' && (
+        <>
+          {/* Party confetti paper background */}
+          <ConfettiBackground />
+
+          <main
+            style={{
+              position: 'relative',
+              zIndex: 1,
+              opacity: 1,
+              transition: 'opacity 0.8s ease',
+            }}
+          >
+            {/* 1. HERO — Birthday Wish with her photos */}
+            <HeroSection />
+
+            <SectionDivider emoji="💍" />
+
+            {/* 2. ROKA — Two photos & story */}
+            <RokaSection />
+
+            <SectionDivider emoji="🌹" />
+
+            {/* 3. FIRST MEETING */}
+            <MeetingSection number={1} />
+
+            <SectionDivider emoji="💌" />
+
+            {/* 4. LOVE LETTERS */}
+            <LoveLettersSection />
+
+            <SectionDivider emoji="🎬" />
+
+            {/* 5. NETFLIX SPECIAL EXPERIENCE */}
+            <NetflixSection />
+
+            <SectionDivider emoji="🍿" />
+
+            {/* 6. SECOND MEETING */}
+            <MeetingSection number={2} />
+
+            <SectionDivider emoji="🌼" />
+
+            {/* 7. THIRD MEETING */}
+            <MeetingSection number={3} />
+
+            <SectionDivider emoji="🎉" />
+
+            {/* 8. BALLOON SURPRISE */}
+            <SurpriseSection />
+
+            <SectionDivider emoji="🌙" />
+
+            {/* 9. FOURTH MEETING */}
+            <MeetingSection number={4} />
+
+            <SectionDivider emoji="⭐" />
+
+            {/* 10. FIFTH MEETING */}
+            <MeetingSection number={5} />
+
+            <SectionDivider emoji="✨" />
+
+            {/* 11. FINAL SURPRISES */}
+            <FinalSurpriseSection />
+          </main>
+        </>
+      )}
+    </>
+  );
+}
