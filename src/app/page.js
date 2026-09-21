@@ -12,6 +12,7 @@ import LoveLettersSection from './components/LoveLettersSection';
 import SurpriseSection from './components/SurpriseSection';
 import FinalSurpriseSection from './components/FinalSurpriseSection';
 import SectionDivider from './components/SectionDivider';
+import MusicPlayer from './components/MusicPlayer';
 
 export default function Home() {
   // Sequence stages: 'cupid' -> 'main'
@@ -28,6 +29,9 @@ export default function Home() {
       {/* Main website content after Cupid's bow animation */}
       {stage === 'main' && (
         <>
+          {/* Background music player */}
+          <MusicPlayer />
+
           {/* Party confetti paper background */}
           <ConfettiBackground />
 
