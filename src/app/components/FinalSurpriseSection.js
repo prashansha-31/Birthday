@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import Image from 'next/image';
 import ScrollReveal from './ScrollReveal';
 
 const wishes = [
@@ -168,7 +169,7 @@ export default function FinalSurpriseSection() {
         </div>
 
         {/* Grand finale */}
-        <ScrollReveal delay={600}>
+        <ScrollReveal delay={500}>
           <div
             style={{
               textAlign: 'center',
@@ -179,6 +180,7 @@ export default function FinalSurpriseSection() {
               backdropFilter: 'blur(20px)',
               position: 'relative',
               overflow: 'hidden',
+              marginBottom: '4rem',
             }}
           >
             {/* Background hearts */}
@@ -262,6 +264,129 @@ export default function FinalSurpriseSection() {
                 }}
               >
                 💕 🌸 💕 🌸 💕
+              </div>
+            </div>
+          </div>
+        </ScrollReveal>
+
+        {/* Divine Ending — Radha Rani Ashirvaad Section */}
+        <ScrollReveal delay={700}>
+          <div
+            style={{
+              textAlign: 'center',
+              padding: '3.5rem 2rem',
+              background: 'linear-gradient(145deg, rgba(255,245,232,0.95), rgba(255,238,245,0.95))',
+              borderRadius: '36px',
+              border: '2px solid rgba(229,180,110,0.6)',
+              boxShadow: '0 20px 60px rgba(194,104,122,0.15), 0 0 40px rgba(255,214,176,0.3)',
+              position: 'relative',
+              overflow: 'hidden',
+            }}
+          >
+            {/* Peacock Feather Icon */}
+            <div
+              style={{
+                fontSize: '3rem',
+                marginBottom: '0.75rem',
+                animation: 'heartBeat 3s ease-in-out infinite',
+              }}
+            >
+              🦚
+            </div>
+
+            <h2
+              style={{
+                fontFamily: "'Great Vibes', cursive",
+                fontSize: 'clamp(2.5rem, 6vw, 4rem)',
+                color: '#b85c37',
+                marginBottom: '1.5rem',
+              }}
+            >
+              In the end… ❤️
+            </h2>
+
+            {/* Radha Krishna Darshan Photo */}
+            <div
+              style={{
+                position: 'relative',
+                width: '100%',
+                maxWidth: '420px',
+                aspectRatio: '4/3',
+                margin: '0 auto 2rem',
+                borderRadius: '24px',
+                overflow: 'hidden',
+                boxShadow: '0 15px 40px rgba(184,92,55,0.25), 0 0 0 6px rgba(255,255,255,0.8)',
+                border: '3px solid rgba(229,180,110,0.8)',
+              }}
+            >
+              <Image
+                src="/assets/radha_krishna.jpg"
+                alt="Sri Sri Radha Krishna Darshan"
+                fill
+                style={{ objectFit: 'cover', objectPosition: 'center 40%' }}
+                sizes="(max-width: 768px) 90vw, 420px"
+              />
+            </div>
+
+            {/* Devotional Text */}
+            <div
+              style={{
+                maxWidth: '650px',
+                margin: '0 auto',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '1.25rem',
+              }}
+            >
+              <p
+                style={{
+                  fontFamily: "'Cormorant Garamond', serif",
+                  fontSize: 'clamp(1.1rem, 2.3vw, 1.35rem)',
+                  color: '#4a2e35',
+                  lineHeight: 1.9,
+                  margin: 0,
+                }}
+              >
+                Shayad humara milna sirf ek ittefaq nahi tha.
+                <br />
+                <strong style={{ color: '#b85c37', fontWeight: 700 }}>
+                  Radha Rani ke ashirvaad se hum dono mile hain
+                </strong>
+                , aur unki kripa se hi hamara rishta itna khoobsurat bana hai. 🦚❤️
+              </p>
+
+              <p
+                style={{
+                  fontFamily: "'Cormorant Garamond', serif",
+                  fontSize: 'clamp(1.1rem, 2.3vw, 1.35rem)',
+                  color: '#4a2e35',
+                  lineHeight: 1.9,
+                  margin: 0,
+                }}
+              >
+                Bas yunhi unka ashirvaad hum dono par bana rahe, aur humara saath hamesha bana rahe. 🫶🏻
+              </p>
+
+              <div
+                style={{
+                  marginTop: '1.5rem',
+                  padding: '1.25rem 2rem',
+                  background: 'linear-gradient(135deg, rgba(229,180,110,0.2), rgba(194,104,122,0.15))',
+                  borderRadius: '50px',
+                  border: '1px solid rgba(229,180,110,0.5)',
+                  display: 'inline-block',
+                }}
+              >
+                <p
+                  style={{
+                    fontFamily: "'Great Vibes', cursive",
+                    fontSize: 'clamp(1.6rem, 4vw, 2.5rem)',
+                    color: '#b85c37',
+                    margin: 0,
+                  }}
+                >
+                  Prem se bolo… Radhe Radhe! 🙏🏻❤️🌸
+                </p>
               </div>
             </div>
           </div>
